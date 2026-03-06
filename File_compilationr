@@ -1,0 +1,115 @@
+library(Seurat)
+library(tidyverse)
+library(data.table)
+library(readxl)
+
+setwd("C:/Users/Zhilin/Documents/Systems_Biology/Miniproject/TISMO_dataset")
+list.files()
+
+# Load all the RDS files
+expr_vitro <- readRDS("TISMO_expressionvitro_profiles.RDS")
+expr_vivo  <- readRDS("TISMO_expressionvivo_profiles.RDS")
+immune_inf <- readRDS("TISMO_immune_infiltration.RDS")
+
+# Check the data structure
+class(expr_vitro)
+class(expr_vivo)
+class(immune_inf)
+
+dim(expr_vitro)
+dim(expr_vivo)
+
+str(expr_vitro)
+str(expr_vivo)
+
+# Check the excel files
+meta_vitro <- read_csv("TISMO_vitrosample_annotations.csv",
+                       show_col_types = FALSE)
+meta_vivo  <- read_csv("TISMO_vivosample_annotations.csv",
+                       show_col_types = FALSE)
+
+# Text annotation
+cellline_anno <- fread("TISMO_cellline_annotations.text")
+
+# Inspect these files: 
+head(meta_vitro)
+head(meta_vivo)
+head(cellline_anno)
+
+colnames(meta_vitro)
+colnames(meta_vivo)
+
+# Check if column names match metadata
+head(colnames(expr_vitro))
+head(colnames(expr_vivo))
+
+# Create Seurat objects
+# In-vitro datasets:
+seurat_vitro <- CreateSeuratObject(
+  counts = expr_vitro,
+  project = "TISMO_vitro"
+)
+
+# In-vivo datasets
+seurat_vivo <- CreateSeuratObject(
+  counts = expr_vivo,
+  project = "TISMO_vivo"
+)
+
+# Attach metadata(In vitro and in vivo respectively)
+meta_vitro <- as.data.frame(meta_vitro)
+rownames(meta_vitro) <- meta_vitro$sample
+
+seurat_vitro <- AddMetaData(
+  seurat_vitro,
+  metadata = meta_vitro
+)
+
+meta_vivo <- as.data.frame(meta_vivo)
+rownames(meta_vivo) <- meta_vivo$sample
+
+seurat_vivo <- AddMetaData(
+  seurat_vivo,
+  metadata = meta_vivo
+)
+
+seurat_vitro
+str(seurat_vitro)
+
+
+# Explore immune infiltration data
+str(immune_inf)
+# note, infiltration dataset contains: immune cell type X sample. 
+# The number is likely immune cell infiltration scores. 
+head(immune_inf)
+colnames(immune_inf)
+rownames(immune_inf)
+# The rownames of immune infiltration contains immune cell types
+
+
+# Append the immune infiltration info to the in vivo dataset
+# 2) Transpose immune infiltration -> sample x immune_feature
+immune_t <- as.data.frame(t(immune_inf))
+
+# (Optional) make sure column names are syntactically safe in R
+colnames(immune_t) <- make.names(colnames(immune_t), unique = TRUE)
+
+# 3) Find shared sample IDs between Seurat and immune table
+common <- intersect(colnames(seurat_vivo), rownames(immune_t))
+length(common)          # how many samples can be annotated?
+head(common)
+
+# 4) Subset to shared samples (and keep ordering aligned)
+# If you want to keep ALL samples in Seurat but only add metadata for those available:
+immune_t_common <- immune_t[common, , drop = FALSE]
+seurat_vivo <- AddMetaData(seurat_vivo, metadata = immune_t_common)
+
+# 5) Quick check: did columns get added?
+# Pick one immune feature you know exists, e.g. "Neutrophil_xCell" (after make.names, becomes Neutrophil_xCell)
+head(seurat_vivo@meta.data[, c("nCount_RNA", "nFeature_RNA", "Neutrophil_xCell")])
+
+saveRDS(seurat_vivo, file = "TISMO_vivo_compiled.rds")
+
+
+# save the in vitro object as well
+saveRDS(seurat_vitro, file = "TISMO_vitro_compiled.rds")
