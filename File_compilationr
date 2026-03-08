@@ -73,6 +73,7 @@ seurat_vivo <- AddMetaData(
   metadata = meta_vivo
 )
 
+
 seurat_vitro
 str(seurat_vitro)
 
@@ -85,6 +86,7 @@ head(immune_inf)
 colnames(immune_inf)
 rownames(immune_inf)
 # The rownames of immune infiltration contains immune cell types
+
 
 
 # Append the immune infiltration info to the in vivo dataset
